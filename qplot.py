@@ -2,22 +2,14 @@ from __future__ import print_function
 import os, re
 from array import array
 import itertools
-import ROOT 
-from optparse import OptionParser
+#from optparse import OptionParser
 
-### set TDR style
-ROOT.gROOT.LoadMacro("~/python/setTDRStyle.C")
-from ROOT import setTDRStyle
-setTDRStyle()
+import ROOT 
 ROOT.PyConfig.IgnoreCommandLineOptions = True
-#ROOT.gROOT.SetBatch(True)
-ROOT.gStyle.SetOptStat(False)
-ROOT.gStyle.SetOptTitle(False)
-ROOT.gStyle.SetErrorX(0.5)
+ROOT.gROOT.SetBatch(False)
 ROOT.gErrorIgnoreLevel = ROOT.kWarning
 
 import argparse
-
 parser = argparse.ArgumentParser(description='overlay ROOT histograms from different files')
 parser.add_argument('files', nargs='+', help='needs at minimum 1 file')
 parser.add_argument('-o','--output', default = 'plot_dir', help = 'name of the plot directory to be created')
@@ -30,6 +22,14 @@ parser.add_argument('-sel','--sel', default='', help = 'TCut selection')
 parser.add_argument('-leg','--leg', default='', help = 'list of name for the TLegend')
 parser.add_argument('-setlogy','--setlogy', help = 'set log scale in the y-axis', action='store_true')
 args = parser.parse_args()
+
+### set TDR style
+ROOT.gROOT.LoadMacro("~/qplot/setTDRStyle.C")
+from ROOT import setTDRStyle
+setTDRStyle()
+ROOT.gStyle.SetOptStat(False)
+ROOT.gStyle.SetOptTitle(False)
+ROOT.gStyle.SetErrorX(0.5)
 
 ### open the ROOT files
 tfiles = [ROOT.TFile.Open(f) for f in args.files]
@@ -51,8 +51,8 @@ for ii, histo in enumerate(histos):
     histo.SetLineColor(colors[ii])
     histo.SetLineStyle(styles[ii])
     if styles[ii] == 1: histo.SetLineWidth(2)
+    histo.GetXaxis().SetNdivisions(505)
 
-### fill histograms
 for ii, histo in enumerate(histos):
     maxEntries = ttrees[ii].GetEntries()
     if args.goFast < 1.0: 
