@@ -21,6 +21,9 @@ parser.add_argument('-ax','-axesTitles','--axesTitles', help = 'x-axisTitle, yax
 parser.add_argument('-sel','--sel', default='', help = 'TCut selection')
 parser.add_argument('-leg','--leg', default='', help = 'list of name for the TLegend')
 parser.add_argument('-setlogy','--setlogy', help = 'set log scale in the y-axis', action='store_true')
+print('printing help always')
+parser.print_help()
+print('now start parsing args and execute the program')
 args = parser.parse_args()
 
 ### set TDR style
@@ -106,6 +109,8 @@ def moveOverflowToLastBin(h1):
     
     h1.SetBinContent(lastBin, totBinContent)
     h1.SetBinError(lastBin, totBinError)
+    h1.SetBinContent(overflowBin, 0)
+    h1.SetBinError(overflowBin, 0)
 
 
 def moveUnderflowToLastBin(h1):
@@ -122,6 +127,8 @@ def moveUnderflowToLastBin(h1):
     
     h1.SetBinContent(firstBin, totBinContent)
     h1.SetBinError(firstBin, totBinError)
+    h1.SetBinContent(underflowBin, 0)
+    h1.SetBinError(underflowBin, 0)
 
 def moveOverflow(histos):
     """moves overflow for all histos in the list"""
