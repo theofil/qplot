@@ -51,11 +51,11 @@ if args.var == 'noVars':
         print("Opened tfiles[%d] = %s with ttree[%d] = %s"%(ii, tfile.GetName(), ii, ttrees[ii].GetName()))
 
 ### make histograms of the same 1 variable stored in identacally structured ttrees, stored in different files
-if isinstance(args.var, list):
+if isinstance(args.var, str):
     binning = args.bins.split(',')
     nBins, xMin, xMax = int(binning[0]), float(binning[1]), float(binning[2])
-    if not args.axesTitles: args.axesTitles = '%s,Events'%(str(args.var[0]))
-    histos = [ROOT.TH1F(str(id(ttree))+str(args.var[0]), str(args.axesTitles), nBins, xMin, xMax) for ttree in ttrees]
+    if not args.axesTitles: args.axesTitles = '%s,Events'%(str(args.var))
+    histos = [ROOT.TH1F(str(id(ttree))+str(args.var), str(args.axesTitles), nBins, xMin, xMax) for ttree in ttrees]
     colors = [1, 2, 4, 6, 7, 8, 9]
     styles = [1, 2, 3, 4, 5, 6, 7]
     for ii, histo in enumerate(histos): 
@@ -73,7 +73,7 @@ if isinstance(args.var, list):
         if args.goFast < 1.0: 
             maxEntries = int(args.goFast*maxEntries)
             print ("going fast with %d entries out of %d"%(maxEntries, ttrees[ii].GetEntries()))
-        ttrees[ii].Draw(str(args.var[0])+'>>'+histos[ii].GetName(), str(args.sel), "goff", maxEntries)
+        ttrees[ii].Draw(str(args.var)+'>>'+histos[ii].GetName(), str(args.sel), "goff", maxEntries)
     plotsReady = True
 
 ### plot histograms
@@ -101,8 +101,8 @@ if plotsReady:
 
 def save(filename=""):
     os.system("mkdir -p "+args.output)
-    filePDF = args.output+'/'+args.var[0]+'_'+filename+'.pdf' 
-    filePNG = args.output+'/'+args.var[0]+'_'+filename+'.png'
+    filePDF = args.output+'/'+args.var+'_'+filename+'.pdf' 
+    filePNG = args.output+'/'+args.var+'_'+filename+'.png'
     print("saving: \n"+filePDF+"\n"+filePNG)
     c1.SaveAs(filePDF)   
     c1.SaveAs(filePNG)   
@@ -150,6 +150,12 @@ def moveOverflow(histos):
         print("moving overflow to last bin for %s"%(hist.GetTitle()))
         moveOverflowToLastBin(hist)
 
+def moveUnderflow(histos):
+    """moves underflow for all histos in the list"""
+    for hist in histos: 
+        print("moving underflow to last bin for %s"%(hist.GetTitle()))
+        moveUnderflowToLastBin(hist)
+
 def printListOfLeaves(myttree, filename = ''):
     if filename != '': 
         fp = open(filename, 'w')
@@ -171,6 +177,11 @@ def setAlias(myttree, aliases):
 
 # https://root.cern.ch/root/html534/guides/users-guide/InputOutput.html#the-logical-root-file-tfile-and-tkey
 def printListOfkeys(tfile):tfile.GetListOfKeys().Print()
+
+if plotsReady:
+    moveOverflow(histos)
+    moveUnderflow(histos)
+    c1.Update()
 
 #paveText = rt.TPaveText(px1, py1, px2, py2,"NDC")
 #paveText.SetBorderSize(0)
