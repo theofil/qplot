@@ -51,7 +51,7 @@ if args.var == 'noVars':
         print("Opened tfiles[%d] = %s with ttree[%d] = %s"%(ii, tfile.GetName(), ii, ttrees[ii].GetName()))
 
 ### make histograms of the same 1 variable stored in identacally structured ttrees, stored in different files
-if isinstance(args.var, str):
+if isinstance(args.var, str) and args.var != 'noVars':
     binning = args.bins.split(',')
     nBins, xMin, xMax = int(binning[0]), float(binning[1]), float(binning[2])
     if not args.axesTitles: args.axesTitles = '%s,Events'%(str(args.var))
@@ -78,9 +78,9 @@ if isinstance(args.var, str):
 
 ### plot histograms
 if plotsReady:
-    c1 = ROOT.TCanvas()
-    c1.cd()
-    if args.setlogy: c1.SetLogy()
+    can1 = ROOT.TCanvas()
+    can1.cd()
+    if args.setlogy: can1.SetLogy()
     histos = sorted(histos, key = lambda h : -h.GetBinContent(h.GetMaximumBin()))
     for ii,histo in enumerate(histos):
         if ii==0: 
@@ -104,8 +104,8 @@ def save(filename=""):
     filePDF = args.output+'/'+args.var+'_'+filename+'.pdf' 
     filePNG = args.output+'/'+args.var+'_'+filename+'.png'
     print("saving: \n"+filePDF+"\n"+filePNG)
-    c1.SaveAs(filePDF)   
-    c1.SaveAs(filePNG)   
+    can1.SaveAs(filePDF)   
+    can1.SaveAs(filePNG)   
 
 
 def moveOverflowToLastBin(h1):
@@ -181,7 +181,7 @@ def printListOfkeys(tfile):tfile.GetListOfKeys().Print()
 if plotsReady:
     moveOverflow(histos)
     moveUnderflow(histos)
-    c1.Update()
+    can1.Update()
 
 #paveText = rt.TPaveText(px1, py1, px2, py2,"NDC")
 #paveText.SetBorderSize(0)
