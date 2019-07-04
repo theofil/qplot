@@ -2,7 +2,6 @@ from __future__ import print_function
 import os, re
 from array import array
 import itertools
-#from optparse import OptionParser
 
 import ROOT 
 ROOT.PyConfig.IgnoreCommandLineOptions = True
@@ -21,7 +20,7 @@ parser.add_argument('-bins','--bins', default = '100,0,100', help = 'bins is a s
 parser.add_argument('-ax','-axesTitles','--axesTitles', help = 'x-axisTitle, yaxisTitle')
 parser.add_argument('-sel','--sel', default='', help = 'TCut selection')
 parser.add_argument('-leg','--leg', default='', help = 'list of name for the TLegend')
-parser.add_argument('-setlogy','--setlogy', help = 'set log scale in the y-axis', action='store_true')
+parser.add_argument('-setlogy','--setlogy','--logy', help = 'set log scale in the y-axis', action='store_true')
 print('printing help always helps ;-)')
 parser.print_help()
 print('now start parsing args and execute the program')
@@ -45,10 +44,35 @@ ttrees = [tfile.Get(args.tree) for tfile in tfiles]
 
 plotsReady = False
 
-if args.var == 'noVars':
-    print('no variables to process were given, leaving you to play in interactive shell') 
+### print list of possible variables of the ROOT file
+def printListOfLeaves(myttree, filename = ''):
+    if filename != '': 
+        fp = open(filename, 'w')
+        print('opening %s to write the list of leaves for %s'%(filename, myttree.GetName()))
+        for leave in myttree.GetListOfLeaves(): 
+            print(leave)
+            fp.write(str(leave)+'\n')
+        print('closing %s'%filename)
+        fp.close()
+    else:
+        for leave in myttree.GetListOfLeaves(): 
+            print(leave)
+
+
+if args.var == 'noVars' and len(tfiles)>0:
+    yes = {'yes','y', 'ye'}
+    no = {'no','n',''}
+    pickUpVar = raw_input('no variables to process were given, would you like to pickup one from the list of %s ? [y/n]'%tfiles[0].GetName()).lower() 
+    if(pickUpVar in yes): 
+        printListOfLeaves(ttrees[0])
+        args.var = raw_input('variable to plot:')
     for ii, tfile in enumerate(tfiles):
         print("Opened tfiles[%d] = %s with ttree[%d] = %s"%(ii, tfile.GetName(), ii, ttrees[ii].GetName()))
+        
+if args.bins =='100,0,100' and args.var!= 'noVars':
+    getBins = raw_input('no binning has been given, use the default \'100,0,100\' ? [press enter for default or give binning to be used]')  
+    if(getBins!=''): args.bins = getBins
+
 
 ### make histograms of the same 1 variable stored in identacally structured ttrees, stored in different files
 if isinstance(args.var, str) and args.var != 'noVars':
@@ -60,7 +84,8 @@ if isinstance(args.var, str) and args.var != 'noVars':
     styles = [1, 2, 3, 4, 5, 6, 7]
     for ii, histo in enumerate(histos): 
         histo.Sumw2()
-        histo.SetTitle(args.leg.split(',')[ii])
+        if args.leg != '':histo.SetTitle(args.leg.split(',')[ii])
+        if args.leg == '':histo.SetTitle(tfiles[ii].GetName())
         histo.GetXaxis().SetTitle(args.axesTitles.split(',')[0])
         histo.GetYaxis().SetTitle(args.axesTitles.split(',')[1])
         histo.SetLineWidth(3)
@@ -156,18 +181,6 @@ def moveUnderflow(histos):
         print("moving underflow to last bin for %s"%(hist.GetTitle()))
         moveUnderflowToLastBin(hist)
 
-def printListOfLeaves(myttree, filename = ''):
-    if filename != '': 
-        fp = open(filename, 'w')
-        print('opening %s to write the list of leaves for %s'%(filename, myttree.GetName()))
-        for leave in myttree.GetListOfLeaves(): 
-            print(leave)
-            fp.write(str(leave)+'\n')
-        print('closing %s'%filename)
-        fp.close()
-    else:
-        for leave in myttree.GetListOfLeaves(): 
-            print(leave)
 
     
 def setAlias(myttree, aliases): 
@@ -182,6 +195,13 @@ if plotsReady:
     moveOverflow(histos)
     moveUnderflow(histos)
     can1.Update()
+
+# have fun with uproot
+def fun():
+    import uproot
+    from matplotlib import pyplot as plt 
+    return [uproot.open(tfile.GetName())[args.tree] for tfile in tfiles] 
+        
 
 #paveText = rt.TPaveText(px1, py1, px2, py2,"NDC")
 #paveText.SetBorderSize(0)
