@@ -1,5 +1,5 @@
 from __future__ import print_function
-import os, re
+import os, re, sys
 from array import array
 import itertools
 
@@ -11,10 +11,8 @@ ROOT.gErrorIgnoreLevel = ROOT.kWarning
 import argparse
 parser = argparse.ArgumentParser(description='overlay ROOT histograms from different files')
 parser.add_argument('files', nargs='+', help='needs at minimum 1 file')
-#parser.add_argument('files', nargs='?', help='needs at minimum 1 file')
 parser.add_argument('-o','--output', default = 'plot_dir', help = 'name of the plot directory to be created')
-parser.add_argument('--tree', default = '', help = 'name of the tree, if is inside a TDir, Dirname/TreeName, otherwise will attemp to fetch from ListOfKnownTTrees')
-#parser.add_argument('--var', nargs='?', help = 'name of the branch, to be printed', default = 'noVars')
+parser.add_argument('--ttree', default = '', help = 'name of the tree, if is inside a TDir, Dirname/TreeName, otherwise will attemp to fetch from ListOfKnownTTrees')
 parser.add_argument('--var', nargs='?', help = 'name of the branch, to be printed', default = '')
 parser.add_argument('--goFast','--gf', default = 1.0, type=float, help = 'process a fraction of  the events for each tree')
 parser.add_argument('--bins', default = '', help = 'bins is a string that holds nBins, xMin, xMax')
@@ -24,9 +22,8 @@ parser.add_argument('--sel', default='', help = 'TCut selection')
 parser.add_argument('--leg', default='', help = 'list of name for the TLegend')
 parser.add_argument('--logy', help = 'set log scale in the y-axis', action='store_true')
 parser.add_argument('--logx', help = 'set log scale in the x-axis', action='store_true')
-print('printing help always helps ;-)')
-parser.print_help()
-print('now start parsing args and execute the program')
+parser.add_argument('--nover', help = 'don\'t move overflow to last bin, by default is True',     action='store_false')
+parser.add_argument('--nunder', help = 'don\'t move underflow to first bin, by default is True',  action='store_false')
 args = parser.parse_args()
 
 ### set TDR style
@@ -39,6 +36,9 @@ ROOT.gStyle.SetErrorX(0.5)
 
 # https://root.cern.ch/root/html534/guides/users-guide/InputOutput.html#the-logical-root-file-tfile-and-tkey
 def printListOfkeys(tfile):tfile.GetListOfKeys().Print()
+
+### list of known TTrees
+listOfknownTrees = ['Events','events', 'ntuple/tree']
 
 ### print list of possible variables of the ROOT file
 def printListOfLeaves(myttree, filename = ''):
@@ -54,9 +54,186 @@ def printListOfLeaves(myttree, filename = ''):
         for leave in myttree.GetListOfLeaves(): 
             print(leave)
 
-### open the ROOT files
+### in case there is any question
 yes = {'yes','y' }
 no = {'no','n',''}
+
+### save a figure
+def save(filename=""):
+    os.system("mkdir -p "+args.output)
+    filePDF = args.output+'/'+args.var+'_'+filename+'.pdf' 
+    filePNG = args.output+'/'+args.var+'_'+filename+'.png'
+    print("saving: \n"+filePDF+"\n"+filePNG)
+    can1.SaveAs(filePDF)   
+    can1.SaveAs(filePNG)   
+
+
+def moveOverflowToLastBin(h1):
+    nBinsX = h1.GetNbinsX()
+    overflowBin = nBinsX + 1
+    lastBin = nBinsX
+    
+    overflowBinContent = h1.GetBinContent(overflowBin)
+    overflowBinError   = h1.GetBinError  (overflowBin) 
+    lastBinContent     = h1.GetBinContent(lastBin)
+    lastBinError       = h1.GetBinError  (lastBin) 
+    
+    totBinContent      = overflowBinContent + lastBinContent
+    totBinError        = (overflowBinError*overflowBinError + lastBinError*lastBinError)**0.5
+    
+    h1.SetBinContent(lastBin, totBinContent)
+    h1.SetBinError(lastBin, totBinError)
+    h1.SetBinContent(overflowBin, 0)
+    h1.SetBinError(overflowBin, 0)
+
+
+def moveUnderflowToLastBin(h1):
+    underflowBin = 0 # underflow bin
+    firstBin     = 1 # first bin with low-edge xlow INCLUDED
+    
+    underflowBinContent = h1.GetBinContent(underflowBin)
+    underflowBinError   = h1.GetBinError  (underflowBin) 
+    firstBinContent     = h1.GetBinContent(firstBin)
+    firstBinError       = h1.GetBinError  (firstBin) 
+    
+    totBinContent      = underflowBinContent + firstBinContent
+    totBinError        = (underflowBinError*underflowBinError + firstBinError*firstBinError)**0.5
+    
+    h1.SetBinContent(firstBin, totBinContent)
+    h1.SetBinError(firstBin, totBinError)
+    h1.SetBinContent(underflowBin, 0)
+    h1.SetBinError(underflowBin, 0)
+
+def moveOverflow(histos):
+    """moves overflow for all histos in the list"""
+    for hist in histos: 
+        print("moving overflow to last bin for %s"%(hist.GetTitle()))
+        moveOverflowToLastBin(hist)
+
+def moveUnderflow(histos):
+    """moves underflow for all histos in the list"""
+    for hist in histos: 
+        print("moving underflow to last bin for %s"%(hist.GetTitle()))
+        moveUnderflowToLastBin(hist)
+    
+def setAlias(myttree, aliases): 
+     for x, y in aliases.items():
+         print('seting alias %s : %s'%(x, y))
+         myttree.SetAlias(x, y)
+
+# have fun with uproot
+def fun():
+    import uproot
+    from matplotlib import pyplot as plt 
+    return [uproot.open(tfile.GetName())[args.ttree] for tfile in tfiles] 
+
+def makeHistos(histos):
+    # if histograms already exist, erase them 
+    while(len(histos)!=0):
+         print('deleting %s'%(histos[-1]))
+         histos[-1].Delete()
+         histos.pop()
+
+    for ii, ttree in enumerate(ttrees):
+        maxEntries = ttree.GetEntries()
+        if args.goFast < 1.0: maxEntries = int(args.goFast*maxEntries)
+
+        # if no binning has been defined, use automatic binning from ROOT (1D histos)
+        if len(args.var.split(':')) == 1 and args.bins == '' and ii==0:
+            ttree.Draw(str(args.var), str(args.sel), "goff", maxEntries)
+            nBins = ROOT.htemp.GetNbinsX() 
+            xMin  = ROOT.htemp.GetXaxis().GetBinLowEdge(1)
+            xMax  = ROOT.htemp.GetXaxis().GetBinLowEdge(nBins) + ROOT.htemp.GetXaxis().GetBinWidth(nBins) 
+            if args.xtitle == '': args.xtitle = ROOT.htemp.GetXaxis().GetTitle()
+            if args.ytitle == '': args.ytitle = ROOT.htemp.GetYaxis().GetTitle()
+            if args.ytitle == '': args.ytitle = 'Events / bin'
+            print('automatic binning from ROOT nBins %d xMin %f xMax %f is set to args.bin'%(nBins, xMin, xMax))
+            args.bins = (nBins, xMin, xMax)
+            print('setting args.xtitle: %s'%args.xtitle)
+            print('setting args.ytitle: %s'%args.ytitle)
+
+        # creating 1D histograms
+        if len(args.var.split(':')) == 1 and len(args.bins) == 3:
+            nBins = int(args.bins[0])
+            xMin  = float(args.bins[1])
+            xMax  = float(args.bins[2])
+            histoID = str(id(ttree))+str(args.var)       
+            histo  = ROOT.TH1F(histoID, ';%s;%s'%(args.xtitle, args.ytitle), nBins, xMin, xMax) 
+            histo.Sumw2()
+            histo.SetTitle(tfiles[ii].GetName())
+            print('creating histogram for ttrees[%d] with histoID %s and maxEntries %d out of %d of tfile[%d] %s'%(ii, histoID, maxEntries, ttree.GetEntries(),ii, tfiles[ii].GetName()))
+            ttree.Draw(str(args.var)+'>>'+histo.GetName(), str(args.sel), "goff", maxEntries)
+            histos += [histo]
+
+    if args.nover: moveOverflow(histos)
+    if args.nunder: moveUnderflow(histos)
+    plotHistos(histos)
+
+
+def plotHistos(histos):
+    if isinstance(args.leg, str): args.leg = [arg for arg in args.leg.split(',')]
+    colors = [1, 2, 4, 6, 7, 8, 9]
+    styles = [1, 2, 3, 4, 5, 6, 7]
+    leg.Clear()
+    can1.Clear()
+    can1.cd()
+    if args.logy: can1.SetLogy()
+    if args.logx: can1.SetLogx()
+    histos = sorted(histos, key = lambda h : -h.GetBinContent(h.GetMaximumBin()))
+    for ii,histo in enumerate(histos):
+        #if len(args.leg.split(',')) == len(histos) and args.leg!='':histo.SetTitle(str(args.leg.split(',')[ii]))
+        if len(args.leg) == len(histos) and args.leg!='':histo.SetTitle(str(args.leg[ii]))
+        histo.GetXaxis().SetNdivisions(505)
+        histo.GetYaxis().SetNdivisions(505)
+        
+        histo.SetLineWidth(3)
+        histo.SetLineColor(colors[ii])
+        histo.SetLineStyle(styles[ii])
+        if styles[ii] == 1: histo.SetLineWidth(2)
+        if ii==0: 
+            histos[ii].Draw("hist")
+        else:
+            histos[ii].Draw("hist same")    
+    leg.SetTextSize(26)
+    leg.SetTextFont(43)
+    leg.SetFillColor(ROOT.kWhite)
+    leg.SetFillStyle(0)
+    leg.SetBorderSize(0)
+    for histo in histos:leg.AddEntry(histo, histo.GetTitle(), 'l')
+    leg.Draw("same")
+    can1.Update()
+
+if __name__ == "__main__":
+   tfiles = [ROOT.TFile.Open(f) for f in args.files]
+
+   ### read the TTrees from files check if ttree is from list of known, or force to use external
+   if args.ttree!='':listOfknownTrees = [args.ttree]
+   ttrees = [tfile.Get(ttree) for tfile in tfiles  for ttree in listOfknownTrees if tfile != None and tfile.Get(ttree)!=None]
+   if len(ttrees) != len(tfiles): 
+       print('not all tfiles have been found with a valid ttree, exiting')
+       os._exit(0)
+
+   ### check if all ttrees have the same name and set it to equal to args.var, print warning if not
+   ttreeNames = [ttree.GetName() for ttree in ttrees]
+   if len(set(ttreeNames))!=1 and len(ttreeNames)>0: print('Warning: not all TTrees have the same name %s'%ttreeNames)
+   else: args.ttree = ttreeNames[0]
+  
+   ### create global pointers to TCanvas and TLegend, histos
+   histos = []
+   can1 = ROOT.TCanvas('can1','can1')
+   lx1, ly1, lx2, ly2 = 0.65, 0.8 , 0.93, 0.93
+   leg = ROOT.TLegend(lx1, ly1, lx2, ly2)
+   
+   ### check if any argument has been given for ploting, print help if not
+   if args.var == '': print ('no variable to be used has been given, use printListOfLeaves(ttrees[N]) to browse the different options and set it via args.var = \'myVar\'')
+   else: 
+       makeHistos(histos)
+    
+       
+
+
+'''
+### open the ROOT files
 print("opening %s"%args.files)
 tfiles = [ROOT.TFile.Open(f) for f in args.files]
 listOfknownTrees = ['Events','events', 'ntuple/tree']
@@ -172,6 +349,15 @@ if isinstance(args.var, str) and args.var != '':
         ttrees[ii].Draw(str(args.var)+'>>'+histos[ii].GetName(), str(args.sel), "goff", maxEntries)
     plotsReady = True
 
+ 
+
+
+
+
+
+if plotsReady:
+    can1.Update()
+
 ### plot histograms
 if plotsReady:
     can1 = ROOT.TCanvas()
@@ -194,84 +380,19 @@ if plotsReady:
     leg.SetBorderSize(0)
     for histo in histos:leg.AddEntry(histo, histo.GetTitle(), 'l')
     leg.Draw("same")
- 
-
-def save(filename=""):
-    os.system("mkdir -p "+args.output)
-    filePDF = args.output+'/'+args.var+'_'+filename+'.pdf' 
-    filePNG = args.output+'/'+args.var+'_'+filename+'.png'
-    print("saving: \n"+filePDF+"\n"+filePNG)
-    can1.SaveAs(filePDF)   
-    can1.SaveAs(filePNG)   
+'''
 
 
-def moveOverflowToLastBin(h1):
-    nBinsX = h1.GetNbinsX()
-    overflowBin = nBinsX + 1
-    lastBin = nBinsX
-    
-    overflowBinContent = h1.GetBinContent(overflowBin)
-    overflowBinError   = h1.GetBinError  (overflowBin) 
-    lastBinContent     = h1.GetBinContent(lastBin)
-    lastBinError       = h1.GetBinError  (lastBin) 
-    
-    totBinContent      = overflowBinContent + lastBinContent
-    totBinError        = (overflowBinError*overflowBinError + lastBinError*lastBinError)**0.5
-    
-    h1.SetBinContent(lastBin, totBinContent)
-    h1.SetBinError(lastBin, totBinError)
-    h1.SetBinContent(overflowBin, 0)
-    h1.SetBinError(overflowBin, 0)
 
 
-def moveUnderflowToLastBin(h1):
-    underflowBin = 0 # underflow bin
-    firstBin     = 1 # first bin with low-edge xlow INCLUDED
-    
-    underflowBinContent = h1.GetBinContent(underflowBin)
-    underflowBinError   = h1.GetBinError  (underflowBin) 
-    firstBinContent     = h1.GetBinContent(firstBin)
-    firstBinError       = h1.GetBinError  (firstBin) 
-    
-    totBinContent      = underflowBinContent + firstBinContent
-    totBinError        = (underflowBinError*underflowBinError + firstBinError*firstBinError)**0.5
-    
-    h1.SetBinContent(firstBin, totBinContent)
-    h1.SetBinError(firstBin, totBinError)
-    h1.SetBinContent(underflowBin, 0)
-    h1.SetBinError(underflowBin, 0)
-
-def moveOverflow(histos):
-    """moves overflow for all histos in the list"""
-    for hist in histos: 
-        print("moving overflow to last bin for %s"%(hist.GetTitle()))
-        moveOverflowToLastBin(hist)
-
-def moveUnderflow(histos):
-    """moves underflow for all histos in the list"""
-    for hist in histos: 
-        print("moving underflow to last bin for %s"%(hist.GetTitle()))
-        moveUnderflowToLastBin(hist)
 
 
-    
-def setAlias(myttree, aliases): 
-     for x, y in aliases.items():
-         print('seting alias %s : %s'%(x, y))
-         myttree.SetAlias(x, y)
 
 
-if plotsReady:
-    moveOverflow(histos)
-    moveUnderflow(histos)
-    can1.Update()
 
-# have fun with uproot
-def fun():
-    import uproot
-    from matplotlib import pyplot as plt 
-    return [uproot.open(tfile.GetName())[args.tree] for tfile in tfiles] 
-        
+
+
+
 
 #paveText = rt.TPaveText(px1, py1, px2, py2,"NDC")
 #paveText.SetBorderSize(0)
