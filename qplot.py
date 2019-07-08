@@ -13,14 +13,17 @@ parser = argparse.ArgumentParser(description='overlay ROOT histograms from diffe
 parser.add_argument('files', nargs='+', help='needs at minimum 1 file')
 #parser.add_argument('files', nargs='?', help='needs at minimum 1 file')
 parser.add_argument('-o','--output', default = 'plot_dir', help = 'name of the plot directory to be created')
-parser.add_argument('-tree','--tree', default = 'Events', help = 'name of the tree, if is inside a TDirectory exampleDir, should be exampleDir/TreeName')
-parser.add_argument('-var','--var', nargs='?', help = 'name of the branch, to be printed', default = 'noVars')
-parser.add_argument('-gf','--goFast', default = 1.0, type=float, help = 'process a fraction of  the events for each tree')
-parser.add_argument('-bins','--bins', default = '100,0,100', help = 'bins is a string that holds nBins, xMin, xMax')
-parser.add_argument('-ax','-axesTitles','--axesTitles', help = 'x-axisTitle, yaxisTitle')
-parser.add_argument('-sel','--sel', default='', help = 'TCut selection')
-parser.add_argument('-leg','--leg', default='', help = 'list of name for the TLegend')
-parser.add_argument('-setlogy','--setlogy','--logy', help = 'set log scale in the y-axis', action='store_true')
+parser.add_argument('--tree', default = '', help = 'name of the tree, if is inside a TDir, Dirname/TreeName, otherwise will attemp to fetch from ListOfKnownTTrees')
+#parser.add_argument('--var', nargs='?', help = 'name of the branch, to be printed', default = 'noVars')
+parser.add_argument('--var', nargs='?', help = 'name of the branch, to be printed', default = '')
+parser.add_argument('--goFast','--gf', default = 1.0, type=float, help = 'process a fraction of  the events for each tree')
+parser.add_argument('--bins', default = '', help = 'bins is a string that holds nBins, xMin, xMax')
+parser.add_argument('--xtitle', default = '', help = 'x-axis title')
+parser.add_argument('--ytitle', default = '', help = 'y-axis title')
+parser.add_argument('--sel', default='', help = 'TCut selection')
+parser.add_argument('--leg', default='', help = 'list of name for the TLegend')
+parser.add_argument('--logy', help = 'set log scale in the y-axis', action='store_true')
+parser.add_argument('--logx', help = 'set log scale in the x-axis', action='store_true')
 print('printing help always helps ;-)')
 parser.print_help()
 print('now start parsing args and execute the program')
@@ -34,15 +37,8 @@ ROOT.gStyle.SetOptStat(False)
 ROOT.gStyle.SetOptTitle(False)
 ROOT.gStyle.SetErrorX(0.5)
 
-### 
-if len(args.files) == 0: 
-    sys.exit('this script needs at least 1 valid ROOT file')    
-
-### open the ROOT files
-tfiles = [ROOT.TFile.Open(f) for f in args.files]
-ttrees = [tfile.Get(args.tree) for tfile in tfiles]
-
-plotsReady = False
+# https://root.cern.ch/root/html534/guides/users-guide/InputOutput.html#the-logical-root-file-tfile-and-tkey
+def printListOfkeys(tfile):tfile.GetListOfKeys().Print()
 
 ### print list of possible variables of the ROOT file
 def printListOfLeaves(myttree, filename = ''):
@@ -58,11 +54,86 @@ def printListOfLeaves(myttree, filename = ''):
         for leave in myttree.GetListOfLeaves(): 
             print(leave)
 
+### open the ROOT files
+yes = {'yes','y' }
+no = {'no','n',''}
+print("opening %s"%args.files)
+tfiles = [ROOT.TFile.Open(f) for f in args.files]
+listOfknownTrees = ['Events','events', 'ntuple/tree']
+ttrees = []
+for tfile in tfiles:
+    if tfile !=None:
+        if args.tree == '':
+            for checkTTreeExistance in listOfknownTrees: 
+                if tfile.Get(checkTTreeExistance) != None:
+                    print("found TTree %s in %s appending it in ttrees"%(checkTTreeExistance, tfile.GetName()))
+                    tfile.ttree = tfile.Get(checkTTreeExistance)
+                    ttrees += [tfile.ttree]            
+        else:
+            print("attempting to fetch %s from %s"%(args.tree, tfile.GetName()))
+            if tfile.Get(args.tree) != None:
+                tfile.ttree = tfile.Get(args.tree)
+                ttrees += [tfile.ttree]
+        if not hasattr(tfile,'ttree'):
+            print("didn't find any ttree inside %s matching the listOfKnownTrees, printing out available keys"%tfile.GetName())
+            printListOfkeys(tfile)
+            pickUpTTree = raw_input('would you like to pickup one ttree from the list of %s ? (y/[n]):'%tfiles[0].GetName()).lower()
+            if(pickUpTTree in yes):
+                args.tree = raw_input('ttree name:')
+                tfile.ttree = tfile.Get(args.tree)
+                ttrees += [tfile.ttree]
+        if args.var != '':tfile.var = args.var
+        if hasattr(tfile,'ttree') and not hasattr(tfile,'var'):
+            pickUpVar = raw_input('no variables to process were given, would you like to pickup one ? (y/[n]):').lower() 
+            if(pickUpVar in yes): 
+                printListOfLeaves(tfile.ttree)
+                tfile.var = raw_input('variable to plot:')
+            if len(tfiles): useThisVarFromNowOn = raw_input('would you like to use the same variable for all remaining tfiles ? (y/[n]):').lower()
+            if useThisVarFromNowOn: args.var = tfile.var
+            if args.bins == '': binsFromInput = raw_input('no binning has been given for %s, would you like to give one ? (y/[n]):'%tfile.var).lower()
+            if binsFromInput in yes: 
+                args.bins = raw_input('please provide comma separated binning nBinsX, xMin, xMax, ... :') 
+                tfile.bins = args.bins
+            if args.xtitle =='': xtitleFromInput =  raw_input('no x-title would you like to give one ? (y/[n]):').lower() 
+            if xtitleFromInput in yes and args.bins != '': 
+                args.xtitle = raw_input('please provide x title:')
+            else: args.xtitle = args.var.split(':')[0]
+            if args.ytitle =='': ytitleFromInput =  raw_input('no y-title would you like to give one ? (y/[n]):').lower() 
+            if ytitleFromInput in yes and args.bins != '': 
+                args.ytitle = raw_input('please provide y-title:')
+                tfiles.ytitle = args.ytitle
+            else:  
+                if len(args.var.split(':'))==2: args.ytitle = args.var.split(':')[1]
+                else:
+                    args.ytitle='Events / bin'
+                    tfile.ytitle='Events / bin' 
+            # 1D histo
+            if len(args.var.split(':'))==1 and len(args.bins.split(','))==3:
+                print('creating a TH1F from given input')
+                nBins = int(tfile.bins.split(',')[0]) 
+                xMin  = float(tfile.bins.split(',')[1]) 
+                xMax  = float(tfile.bins.split(',')[2]) 
+                histo  = ROOT.TH1F(str(id(tfile.ttree))+str(args.var), ';%s;%s'%(args.xtitle, args.ytitle), nBins, xMin, xMax)            
+                maxEntries = tfile.ttree.GetEntries()
+                if args.goFast < 1.0: 
+                    maxEntries = int(args.goFast*maxEntries)
+                    print ("going fast with %d entries out of %d"%(maxEntries, ttrees[ii].GetEntries()))
+                tfile.ttree.Draw(str(args.var)+'>>'+histo.GetName(), str(args.sel), "goff", maxEntries)
 
-if args.var == 'noVars' and len(tfiles)>0:
-    yes = {'yes','y', 'ye'}
-    no = {'no','n',''}
-    pickUpVar = raw_input('no variables to process were given, would you like to pickup one from the list of %s ? [y/n]'%tfiles[0].GetName()).lower() 
+
+                 
+
+            
+                
+    
+#ttrees = [tfile.Get(args.tree) for tfile in tfiles]
+
+### global variable signaling that some plots are ready
+plotsReady = False
+
+
+if args.var == 'noVars' and args.files is not None and len(tfiles)>0 and hasattr(tfiles[0],'ttree'):
+    pickUpVar = raw_input('no variables to process were given, would you like to pickup one from the list of %s ? (y/[n])'%tfiles[0].GetName()).lower() 
     if(pickUpVar in yes): 
         printListOfLeaves(ttrees[0])
         args.var = raw_input('variable to plot:')
@@ -75,7 +146,7 @@ if args.bins =='100,0,100' and args.var!= 'noVars':
 
 
 ### make histograms of the same 1 variable stored in identacally structured ttrees, stored in different files
-if isinstance(args.var, str) and args.var != 'noVars':
+if isinstance(args.var, str) and args.var != '':
     binning = args.bins.split(',')
     nBins, xMin, xMax = int(binning[0]), float(binning[1]), float(binning[2])
     if not args.axesTitles: args.axesTitles = '%s,Events'%(str(args.var))
@@ -105,7 +176,8 @@ if isinstance(args.var, str) and args.var != 'noVars':
 if plotsReady:
     can1 = ROOT.TCanvas()
     can1.cd()
-    if args.setlogy: can1.SetLogy()
+    if args.logy: can1.SetLogy()
+    if args.logx: can1.SetLogx()
     histos = sorted(histos, key = lambda h : -h.GetBinContent(h.GetMaximumBin()))
     for ii,histo in enumerate(histos):
         if ii==0: 
@@ -188,8 +260,6 @@ def setAlias(myttree, aliases):
          print('seting alias %s : %s'%(x, y))
          myttree.SetAlias(x, y)
 
-# https://root.cern.ch/root/html534/guides/users-guide/InputOutput.html#the-logical-root-file-tfile-and-tkey
-def printListOfkeys(tfile):tfile.GetListOfKeys().Print()
 
 if plotsReady:
     moveOverflow(histos)
