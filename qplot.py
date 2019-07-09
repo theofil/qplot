@@ -33,6 +33,7 @@ parser.add_argument('--logy', help = 'set log scale in the y-axis', action='stor
 parser.add_argument('--logx', help = 'set log scale in the x-axis', action='store_true')
 parser.add_argument('--nover', help = 'don\'t move overflow to last bin, by default is True',     action='store_false')
 parser.add_argument('--nunder', help = 'don\'t move underflow to first bin, by default is True',  action='store_false')
+parser.add_argument('--debug', help = 'debug mode, verbose print-out',  action='store_true')
 args = parser.parse_args()
 
 
@@ -155,13 +156,12 @@ def makeHistos(histos):
     for ii, plotElement in enumerate(plotElements):
         # unpack plotElement
         (ttree, var, sel) = plotElement
-        print('(ttree, var, sel) = (%s, %s, %s)'%(ttree, var, sel))
         maxEntries = ttree.GetEntries()
         if args.goFast < 1.0: maxEntries = int(args.goFast*maxEntries)
         ### plot same variable from many different root files
         # if no binning has been defined, use automatic binning from ROOT (1D histos)
         if len(var.split(':')) == 1 and args.bins == [''] and ii==0:
-            print('str(var) = ',str(var))
+            if(args.debug): print('str(var) = ',str(var))
             ttree.Draw(str(var), str(sel), "goff", maxEntries)
             nBins = ROOT.htemp.GetNbinsX() 
             xMin  = ROOT.htemp.GetXaxis().GetBinLowEdge(1)
@@ -176,13 +176,17 @@ def makeHistos(histos):
             nBins = int(args.bins[0])
             xMin  = float(args.bins[1])
             xMax  = float(args.bins[2])
-            histoID = str(id(ttree))+str(var)       
+            histoID = str(id(ttree.tfile)+id(ttree))+str(var)+str(sel)       
+            histoID = histoID.replace('/','__')
             histo  = ROOT.TH1F(histoID, ';%s;%s'%(args.xtitle, args.ytitle), nBins, xMin, xMax) 
             histo.Sumw2()
-            histo.SetTitle(ttree.GetName()+'_'+var+'_'+sel)
-            print('creating histogram for ttrees[%d] with histoID %s and maxEntries %d out of %d '%(ii, histoID, maxEntries, ttree.GetEntries()))
-            print('DrawCmd:',(str(var)+'>>'+histo.GetName()))
-            ttree.Draw(str(var)+'>>'+histo.GetName(), str(sel), "goff", maxEntries)
+            histoTitle = ttree.tfile.GetName()+ttree.GetName()+'_'+var+'_'+sel
+            histoTitle = histoTitle.replace('/','__')
+            histo.SetTitle(histoTitle)
+            #print('creating histo for %s %s %s %s %s and maxEntries %d out of %d '%(ttree.tfile.GetName(), ttree.GetName(), var, sel, histoID, maxEntries, ttree.GetEntries()))
+            drawCmd = str(var)+'>>'+histo.GetName()
+            if(args.debug): print('histo[%d] with Draw(%s, %s, "goff", %d) in %s of %s'%(ii, drawCmd, str(sel), maxEntries, ttree.GetName(), ttree.tfile.GetName()))
+            ttree.Draw(drawCmd, str(sel), "goff", maxEntries)
             histos += [histo]
          
     if args.nover: moveOverflow(histos)
@@ -202,7 +206,13 @@ def plotHistos(histos):
     can1.cd()
     if args.logy: can1.SetLogy()
     if args.logx: can1.SetLogx()
-    histos = sorted(histos, key = lambda h : -h.GetBinContent(h.GetMaximumBin()))
+    #histos = sorted(histos, key = lambda h : -h.GetBinContent(h.GetMaximumBin()))
+    yMin = min(h.GetBinContent(h.GetMinimumBin()) for h in histos)
+    yMax = 1.1*max(h.GetBinContent(h.GetMaximumBin()) for h in histos)
+    if args.logy and yMin == 0: yMin=0.5
+    if args.logy: yMax=1.5*yMax
+    if args.logy and yMax == 0: yMax=1
+
     for ii,histo in enumerate(histos):
         #if len(args.leg.split(',')) == len(histos) and args.leg!='':histo.SetTitle(str(args.leg.split(',')[ii]))
         if len(args.leg) == len(histos) and args.leg!='':histo.SetTitle(str(args.leg[ii]))
@@ -215,6 +225,7 @@ def plotHistos(histos):
         if styles[ii] == 1: histo.SetLineWidth(2)
         if ii==0: 
             histos[ii].Draw("hist")
+            histos[ii].GetYaxis().SetRangeUser(yMin, yMax)
         else:
             histos[ii].Draw("hist same")    
     leg.SetTextSize(26)
@@ -235,7 +246,10 @@ if __name__ == "__main__":
 
    ### read the TTrees from files check if ttree is from list of known, or force to use external
    if args.ttree!='':listOfknownTrees = [args.ttree]
+
    ttrees = [tfile.Get(ttree) for tfile in tfiles  for ttree in listOfknownTrees if tfile != None and tfile.Get(ttree)!=None]
+   for ttree in ttrees: ttree.tfile = ttree.GetCurrentFile()
+
    if len(ttrees) != len(tfiles): 
        print('not all tfiles have been found with a valid ttree, exiting')
        os._exit(0)
