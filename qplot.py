@@ -8,6 +8,15 @@ ROOT.PyConfig.IgnoreCommandLineOptions = True
 ROOT.gROOT.SetBatch(False)
 ROOT.gErrorIgnoreLevel = ROOT.kWarning
 
+### converts parsed parameters from string to list
+def string2list(s): 
+    try: 
+        if isinstance(s, str): s = [x for x in s.split(',')]
+        if isinstance(s, tuple): s = [x for x in s]
+        return s 
+    except: raise argparse.ArgumentTypeError("string must be formatted as 'a, b, c,'")
+
+### parse external parameters
 import argparse
 parser = argparse.ArgumentParser(description='overlay ROOT histograms from different files')
 parser.add_argument('files', nargs='+', help='needs at minimum 1 file')
@@ -15,16 +24,18 @@ parser.add_argument('-o','--output', default = 'plot_dir', help = 'name of the p
 parser.add_argument('--ttree', default = '', help = 'name of the tree, if is inside a TDir, Dirname/TreeName, otherwise will attemp to fetch from ListOfKnownTTrees')
 parser.add_argument('--var', nargs='?', help = 'name of the branch, to be printed', default = '')
 parser.add_argument('--goFast','--gf', default = 1.0, type=float, help = 'process a fraction of  the events for each tree')
-parser.add_argument('--bins', default = '', help = 'bins is a string that holds nBins, xMin, xMax')
+parser.add_argument('--bins', default = '', type = string2list, help = 'bins is a string that holds nBins, xMin, xMax')
 parser.add_argument('--xtitle', default = '', help = 'x-axis title')
 parser.add_argument('--ytitle', default = '', help = 'y-axis title')
 parser.add_argument('--sel', default='', help = 'TCut selection')
-parser.add_argument('--leg', default='', help = 'list of name for the TLegend')
+parser.add_argument('--leg', default='', type =string2list, help = 'list of name for the TLegend')
 parser.add_argument('--logy', help = 'set log scale in the y-axis', action='store_true')
 parser.add_argument('--logx', help = 'set log scale in the x-axis', action='store_true')
 parser.add_argument('--nover', help = 'don\'t move overflow to last bin, by default is True',     action='store_false')
 parser.add_argument('--nunder', help = 'don\'t move underflow to first bin, by default is True',  action='store_false')
 args = parser.parse_args()
+
+
 
 ### set TDR style
 ROOT.gROOT.LoadMacro("~/qplot/setTDRStyle.C")
@@ -128,52 +139,64 @@ def fun():
     return [uproot.open(tfile.GetName())[args.ttree] for tfile in tfiles] 
 
 def makeHistos(histos):
+    # convert strings to lists if needed
+    if isinstance(args.leg,  str): args.leg = [arg for arg in args.leg.split(',')]
+    if isinstance(args.bins, str): args.bins = [arg for arg in args.bins.split(',')]
+    if isinstance(args.var,  str): args.var = [arg for arg in args.var.split(',')]
+    if isinstance(args.sel,  str): args.sel = [arg for arg in args.sel.split(',')]
     # if histograms already exist, erase them 
     while(len(histos)!=0):
          print('deleting %s'%(histos[-1]))
          histos[-1].Delete()
          histos.pop()
 
-    for ii, ttree in enumerate(ttrees):
+    plotElements = ((x,y,z) for x in ttrees for y in args.var for z in args.sel)
+
+    for ii, plotElement in enumerate(plotElements):
+        # unpack plotElement
+        (ttree, var, sel) = plotElement
+        print('(ttree, var, sel) = (%s, %s, %s)'%(ttree, var, sel))
         maxEntries = ttree.GetEntries()
         if args.goFast < 1.0: maxEntries = int(args.goFast*maxEntries)
-
+        ### plot same variable from many different root files
         # if no binning has been defined, use automatic binning from ROOT (1D histos)
-        if len(args.var.split(':')) == 1 and args.bins == '' and ii==0:
-            ttree.Draw(str(args.var), str(args.sel), "goff", maxEntries)
+        if len(var.split(':')) == 1 and args.bins == [''] and ii==0:
+            print('str(var) = ',str(var))
+            ttree.Draw(str(var), str(sel), "goff", maxEntries)
             nBins = ROOT.htemp.GetNbinsX() 
             xMin  = ROOT.htemp.GetXaxis().GetBinLowEdge(1)
             xMax  = ROOT.htemp.GetXaxis().GetBinLowEdge(nBins) + ROOT.htemp.GetXaxis().GetBinWidth(nBins) 
-            if args.xtitle == '': args.xtitle = ROOT.htemp.GetXaxis().GetTitle()
-            if args.ytitle == '': args.ytitle = ROOT.htemp.GetYaxis().GetTitle()
-            if args.ytitle == '': args.ytitle = 'Events / bin'
             print('automatic binning from ROOT nBins %d xMin %f xMax %f is set to args.bin'%(nBins, xMin, xMax))
-            args.bins = (nBins, xMin, xMax)
+            args.bins = [nBins, xMin, xMax]
             print('setting args.xtitle: %s'%args.xtitle)
             print('setting args.ytitle: %s'%args.ytitle)
 
         # creating 1D histograms
-        if len(args.var.split(':')) == 1 and len(args.bins) == 3:
+        if len(var.split(':')) == 1 and len(args.bins) == 3:
             nBins = int(args.bins[0])
             xMin  = float(args.bins[1])
             xMax  = float(args.bins[2])
-            histoID = str(id(ttree))+str(args.var)       
+            histoID = str(id(ttree))+str(var)       
             histo  = ROOT.TH1F(histoID, ';%s;%s'%(args.xtitle, args.ytitle), nBins, xMin, xMax) 
             histo.Sumw2()
-            histo.SetTitle(tfiles[ii].GetName())
-            print('creating histogram for ttrees[%d] with histoID %s and maxEntries %d out of %d of tfile[%d] %s'%(ii, histoID, maxEntries, ttree.GetEntries(),ii, tfiles[ii].GetName()))
-            ttree.Draw(str(args.var)+'>>'+histo.GetName(), str(args.sel), "goff", maxEntries)
+            histo.SetTitle(ttree.GetName()+'_'+var+'_'+sel)
+            print('creating histogram for ttrees[%d] with histoID %s and maxEntries %d out of %d '%(ii, histoID, maxEntries, ttree.GetEntries()))
+            print('DrawCmd:',(str(var)+'>>'+histo.GetName()))
+            ttree.Draw(str(var)+'>>'+histo.GetName(), str(sel), "goff", maxEntries)
             histos += [histo]
-
+         
     if args.nover: moveOverflow(histos)
     if args.nunder: moveUnderflow(histos)
     plotHistos(histos)
 
 
 def plotHistos(histos):
-    if isinstance(args.leg, str): args.leg = [arg for arg in args.leg.split(',')]
-    colors = [1, 2, 4, 6, 7, 8, 9]
-    styles = [1, 2, 3, 4, 5, 6, 7]
+    # convert strings to lists if needed
+    if isinstance(args.leg,  str): args.leg = [arg for arg in args.leg.split(',')]
+    if isinstance(args.bins, str): args.bins = [arg for arg in args.bins.split(',')]
+    if isinstance(args.var,  str): args.var = [arg for arg in args.var.split(',')]
+    if isinstance(args.sel,  str): args.sel = [arg for arg in args.sel.split(',')]
+    # clear legend and canvas
     leg.Clear()
     can1.Clear()
     can1.cd()
@@ -203,6 +226,10 @@ def plotHistos(histos):
     leg.Draw("same")
     can1.Update()
 
+def guessMissingArgs(args):
+    if args.xtitle == '': args.xtitle = args.var
+    if args.ytitle == '': args.ytitle = 'Events / bin'
+
 if __name__ == "__main__":
    tfiles = [ROOT.TFile.Open(f) for f in args.files]
 
@@ -218,15 +245,18 @@ if __name__ == "__main__":
    if len(set(ttreeNames))!=1 and len(ttreeNames)>0: print('Warning: not all TTrees have the same name %s'%ttreeNames)
    else: args.ttree = ttreeNames[0]
   
-   ### create global pointers to TCanvas and TLegend, histos
+   ### create global pointers to TCanvas and TLegend, histos and define color styles and more
    histos = []
    can1 = ROOT.TCanvas('can1','can1')
    lx1, ly1, lx2, ly2 = 0.65, 0.8 , 0.93, 0.93
    leg = ROOT.TLegend(lx1, ly1, lx2, ly2)
+   colors = [1, 2, 4, 6, 7, 8, 9]
+   styles = [1, 2, 3, 4, 5, 6, 7]
    
    ### check if any argument has been given for ploting, print help if not
    if args.var == '': print ('no variable to be used has been given, use printListOfLeaves(ttrees[N]) to browse the different options and set it via args.var = \'myVar\'')
    else: 
+       guessMissingArgs(args) 
        makeHistos(histos)
     
        
