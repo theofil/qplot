@@ -53,7 +53,7 @@ a:hover { text-decoration: underline; color: rgb(255,80,80); }
 </style>
 </head>
 <body style="padding: 20px">
-<p style="text-align:right;color:red;font-size:20px">Credits for this beatiful PHF script: <a href="https://github.com/gpetruc">Giovanni Petrucciani</a></p>
+<p style="text-align:right;color:red;font-size:16px">Credits for this beatiful PHP script: <a href="https://github.com/gpetruc">Giovanni Petrucciani</a></p>
     <h1 style='word-break: break-all; line-height: 25px;'><?php echo $title; ?></h1>
 <h2>
 <?php

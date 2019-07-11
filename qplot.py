@@ -142,7 +142,8 @@ def setAlias(myttree, aliases):
 def fun():
     import uproot
     from matplotlib import pyplot as plt 
-    return [uproot.open(tfile.GetName())[args.ttree] for tfile in tfiles] 
+    #return [uproot.open(ttree.tfile.GetName())[ttree.GetName()] for ttree in ttrees] 
+    return [uproot.open(tfile.GetName())[ttree] for tfile in tfiles  for ttree in listOfknownTrees if tfile != None and tfile.Get(ttree)!=None]
 
 def makeHistos(histos):
     # convert strings to lists if needed
