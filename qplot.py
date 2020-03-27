@@ -52,7 +52,7 @@ ROOT.gStyle.SetErrorX(0.5)
 def printListOfkeys(tfile):tfile.GetListOfKeys().Print()
 
 ### list of known TTrees
-listOfknownTrees = ['Events','events', 'ntuple/tree']
+listOfknownTrees = ['Events','events', 'ntuple/tree','tree']
 
 ### print list of possible variables of the ROOT file
 def printListOfLeaves(myttree, filename = ''):
@@ -253,6 +253,7 @@ def guessMissingArgs(args):
     if args.ytitle == '': args.ytitle = 'Events / bin'
 
 if __name__ == "__main__":
+   print('qplot script by KT, don\'t forget to run it with -i for entering interactive mode, e.g.,: python -i ~/qplot.py file.root')
    tfiles = [ROOT.TFile.Open(f) for f in args.files]
 
    ### read the TTrees from files check if ttree is from list of known, or force to use external
