@@ -184,6 +184,9 @@ def makeHistos(histos):
             xMax  = float(args.bins[2])
             histoID = str(id(ttree.tfile)+id(ttree))+str(var)+str(sel)       
             histoID = histoID.replace('/','__')
+            histoID = histoID.replace('(','_')
+            histoID = histoID.replace(')','_')
+            histoID = histoID.replace('*','')
             histo  = ROOT.TH1F(histoID, ';%s;%s'%(args.xtitle, args.ytitle), nBins, xMin, xMax) 
             histo.Sumw2()
             histoTitle = ttree.tfile.GetName()+ttree.GetName()+'_'+var+'_'+sel
@@ -231,6 +234,11 @@ def plotHistos(histos):
         histo.GetYaxis().SetNdivisions(505)
         
         histo.SetLineWidth(3)
+        global colors
+        global styles
+        if(ii >= len(colors)):
+            colors += [i for i in range(colors[-1]+1, colors[-1]+ii+1)]
+            styles += [i for i in range(styles[-1]+1, styles[-1]+ii+1)]
         histo.SetLineColor(colors[ii])
         histo.SetLineStyle(styles[ii])
         if styles[ii] == 1: histo.SetLineWidth(2)
