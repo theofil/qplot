@@ -30,6 +30,7 @@ parser.add_argument('--ytitle', default = '', help = 'y-axis title')
 parser.add_argument('--sel', default='', help = 'TCut selection')
 parser.add_argument('--leg', default='', type =string2list, help = 'list of name for the TLegend')
 parser.add_argument('--logy', help = 'set log scale in the y-axis', action='store_true')
+parser.add_argument('--norm', help = 'normalize histograms', action='store_true')
 parser.add_argument('--logx', help = 'set log scale in the x-axis', action='store_true')
 parser.add_argument('--nover', help = 'don\'t move overflow to last bin, by default is True',     action='store_false')
 parser.add_argument('--nunder', help = 'don\'t move underflow to first bin, by default is True',  action='store_false')
@@ -220,18 +221,27 @@ def plotHistos(histos):
     leg.SetX2NDC(lx2)
     leg.SetY1NDC(ly1)
     leg.SetY2NDC(ly2)
-    #histos = sorted(histos, key = lambda h : -h.GetBinContent(h.GetMaximumBin()))
+
+    # normalize histograms 
+    if args.norm: 
+        for h in histos: h.Scale(1/h.Integral())
+
+
+    # find yMin yMax
     yMin = min(h.GetBinContent(h.GetMinimumBin()) for h in histos)
     yMax = 1.1*max(h.GetBinContent(h.GetMaximumBin()) for h in histos)
-    if args.logy and yMin == 0: yMin=0.5
+    if args.logy and yMin == 0: 
+        if args.norm: yMin=0.0001 
+        else: yMin = 0.5
     if args.logy: yMax=1.5*yMax
     if args.logy and yMax == 0: yMax=1
+    print('yMin = %2.3f yMax = %2.3f'%(yMin, yMax))
 
     for ii,histo in enumerate(histos):
-        #if len(args.leg.split(',')) == len(histos) and args.leg!='':histo.SetTitle(str(args.leg.split(',')[ii]))
         if len(args.leg) == len(histos) and args.leg!='':histo.SetTitle(str(args.leg[ii]))
         histo.GetXaxis().SetNdivisions(505)
         histo.GetYaxis().SetNdivisions(505)
+       
         
         histo.SetLineWidth(3)
         global colors
@@ -258,7 +268,9 @@ def plotHistos(histos):
 
 def guessMissingArgs(args):
     if args.xtitle == '': args.xtitle = args.var
-    if args.ytitle == '': args.ytitle = 'Events / bin'
+    if args.ytitle == '': 
+        if args.norm: args.ytitle = 'Frequency' 
+        else: args.ytitle = 'Events / bin'
 
 if __name__ == "__main__":
    print('qplot script by KT, don\'t forget to run it with -i for entering interactive mode, e.g.,: python -i ~/qplot.py file.root')
