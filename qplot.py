@@ -26,8 +26,10 @@ parser.add_argument('--var', nargs='?', help = 'name of the branch, to be printe
 parser.add_argument('--goFast','--gf', default = 1.0, type=float, help = 'process a fraction of  the events for each tree')
 parser.add_argument('--bins', default = '', type = string2list, help = 'bins is a string that holds nBins, xMin, xMax')
 parser.add_argument('--xtitle', default = '', help = 'x-axis title')
+parser.add_argument('--yrange', default = '', help = 'y-axis range')
 parser.add_argument('--ytitle', default = '', help = 'y-axis title')
 parser.add_argument('--sel', default='', help = 'TCut selection')
+parser.add_argument('--drawopt', default = '', help = 'draw options')
 parser.add_argument('--leg', default='', type =string2list, help = 'list of name for the TLegend')
 parser.add_argument('--logy', help = 'set log scale in the y-axis', action='store_true')
 parser.add_argument('--norm', help = 'normalize histograms', action='store_true')
@@ -230,11 +232,18 @@ def plotHistos(histos):
     # find yMin yMax
     yMin = min(h.GetBinContent(h.GetMinimumBin()) for h in histos)
     yMax = 1.1*max(h.GetBinContent(h.GetMaximumBin()) for h in histos)
+    
     if args.logy and yMin == 0: 
         if args.norm: yMin=0.0001 
         else: yMin = 0.5
     if args.logy: yMax=1.5*yMax
     if args.logy and yMax == 0: yMax=1
+
+    if args.yrange !='':
+        global ymin, ymax
+        yMin = float(args.yrange.split(',')[0])
+        yMax = float(args.yrange.split(',')[1])
+
     print('yMin = %2.3f yMax = %2.3f'%(yMin, yMax))
 
     for ii,histo in enumerate(histos):
@@ -253,7 +262,9 @@ def plotHistos(histos):
         histo.SetLineStyle(styles[ii])
         if styles[ii] == 1: histo.SetLineWidth(2)
         if ii==0: 
-            histos[ii].Draw("hist")
+            drawopt ='hist'
+            if args.drawopt != '': drawopt = args.drawopt
+            histos[ii].Draw(drawopt)
             histos[ii].GetYaxis().SetRangeUser(yMin, yMax)
         else:
             histos[ii].Draw("hist same")    
