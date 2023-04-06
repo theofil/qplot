@@ -20,10 +20,9 @@ def string2list(s):
 import argparse
 parser = argparse.ArgumentParser(description='overlay ROOT histograms from different files')
 parser.add_argument('files', nargs='+', help='needs at minimum 1 file')
-parser.add_argument('--output', default = 'qplots', help = 'name of the plot directory to be created')
 parser.add_argument('--ttree', default = '', help = 'name of the tree, if is inside a TDir, Dirname/TreeName, otherwise will attemp to fetch from ListOfKnownTTrees')
 parser.add_argument('--var', nargs='?', help = 'name of the branch, to be printed', default = '')
-parser.add_argument('--goFast','--gf', default = 1.0, type=float, help = 'process a fraction of  the events for each tree')
+parser.add_argument('--goFast', default = 1.0, type=float, help = 'process a fraction of  the events for each tree')
 parser.add_argument('--bins', default = '', type = string2list, help = 'bins is a string that holds nBins, xMin, xMax')
 parser.add_argument('--xtitle', default = '', help = 'x-axis title')
 parser.add_argument('--yrange', default = '', help = 'y-axis range')
@@ -38,7 +37,7 @@ parser.add_argument('--nover', help = 'don\'t move overflow to last bin, by defa
 parser.add_argument('--nunder', help = 'don\'t move underflow to first bin, by default is True',  action='store_false')
 parser.add_argument('--debug', help = 'debug mode, verbose print-out',  action='store_true')
 parser.add_argument('--legpos', default = '0.65,0.75,0.93,0.90', help = 'positioning of the legend, default is top-right: 0.65, 0.75 , 0.93, 0.90')
-parser.add_argument('--save', default = '', help = 'give filename of the figures to be saved, will produce filename.pdf and filename.png')
+parser.add_argument('--save', nargs='?', default = '', help = 'give filename of the figures to be saved, will produce filename.pdf and filename.png')
 args = parser.parse_args()
 
 
@@ -76,13 +75,15 @@ yes = {'yes','y' }
 no = {'no','n',''}
 
 ### save a figure
-def save(filename=""):
-    os.system("mkdir -p "+args.output)
-    if not os.path.exists(args.output+'/index.php'):
+def save(filename):
+    outputDir = 'qplots'
+    print('creating folder',outputDir,' if does not already exist and saving figures')
+    os.system("mkdir -p "+outputDir)
+    if not os.path.exists(outputDir+'/index.php'):
         pathname = os.path.dirname(sys.argv[0])        
-        os.system("cp "+pathname+"/index.php "+args.output)
-    filePDF = args.output+'/'+filename+'.pdf' 
-    filePNG = args.output+'/'+filename+'.png'
+        os.system("cp "+pathname+"/index.php "+outputDir)
+    filePDF = outputDir+'/'+filename+'.pdf' 
+    filePNG = outputDir+'/'+filename+'.png'
     print("saving: \n"+filePDF+"\n"+filePNG)
     can1.SaveAs(filePDF)   
     can1.SaveAs(filePNG)   
@@ -315,7 +316,9 @@ if __name__ == "__main__":
    else: 
        guessMissingArgs(args) 
        makeHistos(histos)
-       if args.save!='':save(args.save)
+       ### saving output to default folder, qplots
+       if args.save==None:save(args.var[0])
+       if args.save!=None and args.save!='':save(args.save)
     
        
 
