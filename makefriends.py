@@ -3,7 +3,8 @@ import os, re, sys
 from array import array
 import itertools
 
-import ROOT 
+
+import ROOT
 ROOT.PyConfig.IgnoreCommandLineOptions = True
 ROOT.gROOT.SetBatch(False)
 ROOT.gErrorIgnoreLevel = ROOT.kWarning
@@ -23,7 +24,8 @@ parser = argparse.ArgumentParser(description='making friends')
 parser.add_argument('files', nargs='+', help='needs at minimum 1 file')
 parser.add_argument('--output', default = '', help = 'name of the plot directory to be created')
 parser.add_argument('--ttree', default = '', help = 'name of the tree, if is inside a TDir, Dirname/TreeName, otherwise will attemp to fetch from ListOfKnownTTrees')
-parser.add_argument('--weight', default = 1.0, help = 'mutliplicative weight for normalization', type=float)
+parser.add_argument('--weight', default = 1.0, help = 'user provided mutliplicative weight for normalization', type=float)
+parser.add_argument('--genWeight', default = "genWeight", help = 'MC weight from event generator', type=str)
 parser.add_argument('--goFast', default = 1.0, help = 'if set, will only process fraction of the entries', type=float)
 args = parser.parse_args()
 
@@ -52,12 +54,6 @@ class counter:
 ### list of known TTrees
 listOfknownTrees = ['Events','events', 'ntuple/tree','tree']
 
-### define my ROOT.Math.PtEtaPhiMVector class
-#class myPtEtaPhiMVector(ROOT.Math.PtEtaPhiMVector): pass 
-#class myPtEtaPhiMVector:
-#    def __init__(self, Pt, Eta, Phi, M):
-#	self = ROOT.PtEtaPhiMVector(Pt, Eta, Phi, M)
-
 if __name__ == "__main__":
     tfiles = [ROOT.TFile.Open(f) for f in args.files]
 
@@ -73,17 +69,30 @@ if __name__ == "__main__":
 
     minimalPrint = True
 
+
     ### check if all ttrees have the same name and set it to equal to args.ttree, print warning if not
     ttreeNames = [ttree.GetName() for ttree in ttrees]
     if len(set(ttreeNames))!=1 and len(ttreeNames)>0: print('Warning: not all TTrees have the same name %s'%ttreeNames)
     else: args.ttree = ttreeNames[0]
 
-    ### find the total number of entries for all ttrees
+
+    ### RDataFrame of all files
+    print("Getting sum of weights for all input files")
+    sumWtot = 0
     Ntot = 0
-    for ttree in ttrees: Ntot += ttree.GetEntries()
-    if args.goFast != 1.0:
-	print('Reducing Ntot due to goFast flag to %2.1f = %d * %2.10f'%(args.goFast*Ntot,Ntot, args.goFast))
-        Ntot = args.goFast*Ntot
+    for ii, ttree in enumerate(ttrees):
+	df = ROOT.RDataFrame(ttree)
+        sumW = 0
+        try:
+	    sumW = df.Sum(args.genWeight).GetValue() 
+	except TypeError:
+	    print(args.genWeight, " is not part of the given ttrees, use --genWeight branchName to fix this or assume no such branch and count each entry as 1 event")
+            sumW = ttree.GetEntries()
+        print('%s with %d entries and sumW = %2.1f'%(tfiles[ii].GetName(), ttree.GetEntries(), sumW))
+        Ntot += ttree.GetEntries()
+        sumWtot += sumW
+    
+    print("sumWtot %d   Ntot %d"%(sumWtot, Ntot))
 
     ### one output tree for all inputs, using the name of the first by default 
     outname = tfiles[0].GetName()[0:-4].split('/')[-1]+'friend'+'.root' 
@@ -93,8 +102,8 @@ if __name__ == "__main__":
     ofile = ROOT.TFile(outname,"RECREATE")
     otree = ROOT.TTree(ttree.GetName(), ttree.GetName()) # same name as original
 
-    hSumW  = ROOT.TH1I("hSumW","hSumW",1,0,1)
-    hSumW2 = ROOT.TH1I("hSumW2","hSumW2",1,0,1)
+    hSumW  = ROOT.TH1D("hSumW","hSumW",1, 0, 1)
+    hSumW.Sumw2()
 
     ### ttree variables
     tvars = []
@@ -144,12 +153,14 @@ if __name__ == "__main__":
 		if typecode == 'i': var[i] = int(-99)
 		if typecode == 'B': var[i] = False
 
+    count = counter()
+    count.alleve   = 0
+    count.sumW     = 0
+    count.sumW2    = 0
+
     ### loop over the trees
     for ii,ttree in enumerate(ttrees):
 	print("opening %s"%tfiles[ii].GetName())
-	count = counter()
-	count.alleve   = 0
-        count.sumW = 0
 
 	### start the bloody event loop for each tree
 	for iev, event in enumerate(ttree):
@@ -160,11 +171,11 @@ if __name__ == "__main__":
 	    reset()
 
 	    nGenDressedLepton = event.nGenDressedLepton
-            t_kWeight[0]      = event.genWeight*args.weight/Ntot 
+            t_kWeight[0]      = event.genWeight*args.weight/sumWtot 
             t_kFile[0]        = ii 
             count.sumW        += t_kWeight[0]
+            count.sumW2       += t_kWeight[0]*t_kWeight[0]
             hSumW.Fill(0, t_kWeight[0])
-            hSumW2.Fill(0, t_kWeight[0]*t_kWeight[0])
 
             GenLeptons = []
             for i in range(event.nGenDressedLepton):
@@ -226,17 +237,16 @@ if __name__ == "__main__":
 	    otree.Fill()
 	    count.alleve += 1
 
-        print('hSumW.Integral() %2.1f'%hSumW.Integral())
-        print('hSumW2.Integral() %2.1f'%hSumW2.Integral())
-	print('number of events processed %d'%count.alleve)
-	print('number of entries in the TTree %d'%ttree.GetEntries())
-	print('number of sumW %3.1f'%count.sumW)
+    print('hSumW.Integral() %2.1f'%hSumW.Integral())
+    print('number of events processed %d'%count.alleve)
+    print('number of entries in the TTree %d'%ttree.GetEntries())
+    print('number of sumW %3.1f'%count.sumW)
+    print('number of sumW2 %3.1f'%count.sumW2)
 
     ### creating output 
     ofile.cd()
     otree.Write()
     hSumW.Write()
-    hSumW2.Write()
     ofile.Write()
     ofile.Close()
    
