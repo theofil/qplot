@@ -18,7 +18,16 @@ def string2list(s):
 
 ### parse external parameters
 import argparse
-parser = argparse.ArgumentParser(description='overlay ROOT histograms from different files')
+
+### overide default argparse behavior of the error method 
+class MyParser(argparse.ArgumentParser):
+    def error(self, message):
+        sys.stderr.write('error: %s\n' % message)
+        self.print_help()
+        sys.exit(2)
+
+parser = MyParser()
+
 parser.add_argument('files', nargs='+', help='needs at minimum 1 file')
 parser.add_argument('--ttree', default = '', help = 'name of the tree, if is inside a TDir, Dirname/TreeName, otherwise will attemp to fetch from ListOfKnownTTrees')
 parser.add_argument('--var', nargs='?', help = 'name of the branch, to be printed', default = '')
@@ -201,9 +210,16 @@ def makeHistos(histos):
             if(args.debug): print('histo[%d] with Draw(%s, %s, "goff", %d) in %s of %s'%(ii, drawCmd, str(sel), maxEntries, ttree.GetName(), ttree.tfile.GetName()))
             ttree.Draw(drawCmd, str(sel), "goff", maxEntries)
             histos += [histo]
+
+    ### print sum of weights 
+    for ii, histo in enumerate(histos):
+	    if len(args.leg) == len(histos) and args.leg!='':histo.SetTitle(str(args.leg[ii]))
+	    sumW  = histo.GetSumOfWeights()
+	    print('%s has sumW = %2.1f'%(histo.GetTitle(), sumW))
          
     if args.nover: moveOverflow(histos)
     if args.nunder: moveUnderflow(histos)
+
     plotHistos(histos)
 
 
@@ -234,7 +250,7 @@ def plotHistos(histos):
     yMin = min(h.GetBinContent(h.GetMinimumBin()) for h in histos)
     yMax = 1.1*max(h.GetBinContent(h.GetMaximumBin()) for h in histos)
     
-    if args.logy and yMin == 0: 
+    if args.logy and yMin <= 0: 
         if args.norm: yMin=0.0001 
         else: yMin = 0.5
     if args.logy: yMax=1.5*yMax
@@ -253,7 +269,7 @@ def plotHistos(histos):
         histo.GetYaxis().SetNdivisions(505)
        
         
-        histo.SetLineWidth(3)
+        histo.SetLineWidth(4)
         global colors
         global styles
         if(ii >= len(colors)):
@@ -261,7 +277,7 @@ def plotHistos(histos):
             styles += [i for i in range(styles[-1]+1, styles[-1]+ii+1)]
         histo.SetLineColor(colors[ii])
         histo.SetLineStyle(styles[ii])
-        if styles[ii] == 1: histo.SetLineWidth(2)
+        if styles[ii] == 1: histo.SetLineWidth(3)
         if ii==0: 
             drawopt ='hist'
             if args.drawopt != '': drawopt = args.drawopt
@@ -284,6 +300,7 @@ def guessMissingArgs(args):
         if args.norm: args.ytitle = 'Frequency' 
         else: args.ytitle = 'Events / bin'
 
+
 if __name__ == "__main__":
    print('qplot script by KT, don\'t forget to run it with -i for entering interactive mode, e.g.,: python -i ~/qplot.py file.root')
    tfiles = [ROOT.TFile.Open(f) for f in args.files]
@@ -292,11 +309,23 @@ if __name__ == "__main__":
    if args.ttree!='':listOfknownTrees = [args.ttree]
 
    ttrees = [tfile.Get(ttree) for tfile in tfiles  for ttree in listOfknownTrees if tfile != None and tfile.Get(ttree)!=None]
+
+   ### add as attribute the tfile name of each tree
    for ttree in ttrees: ttree.tfile = ttree.GetCurrentFile()
 
    if len(ttrees) != len(tfiles): 
        print('not all tfiles have been found with a valid ttree, exiting')
        os._exit(0)
+
+   ### root data frames
+   rdfs = [ROOT.RDataFrame(ttree) for ttree in ttrees]
+   weightBranchName = "kWeight"
+   sumWs = []
+   for ii, rdf in enumerate(rdfs):
+       if weightBranchName in rdf.GetColumnNames():
+           sumW = rdf.Sum("kWeight").GetValue()
+           print('File %s opened with sumW = %2.1f'%(ttrees[ii].tfile.GetName(), sumW))	 
+     
 
    ### check if all ttrees have the same name and set it to equal to args.var, print warning if not
    ttreeNames = [ttree.GetName() for ttree in ttrees]
