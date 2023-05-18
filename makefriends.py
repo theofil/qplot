@@ -24,7 +24,7 @@ parser = argparse.ArgumentParser(description='making friends')
 parser.add_argument('files', nargs='+', help='needs at minimum 1 file')
 parser.add_argument('--output', default = '', help = 'name of the plot directory to be created')
 parser.add_argument('--ttree', default = '', help = 'name of the tree, if is inside a TDir, Dirname/TreeName, otherwise will attemp to fetch from ListOfKnownTTrees')
-parser.add_argument('--weight', default = 1.0, help = 'user provided mutliplicative weight for normalization', type=float)
+parser.add_argument('--xs', default = 1.0, help = 'user provided cross section for normalization', type=float)
 parser.add_argument('--genWeight', default = "genWeight", help = 'MC weight from event generator', type=str)
 parser.add_argument('--goFast', default = 1.0, help = 'if set, will only process fraction of the entries', type=float)
 args = parser.parse_args()
@@ -171,7 +171,7 @@ if __name__ == "__main__":
 	    reset()
 
 	    nGenDressedLepton = event.nGenDressedLepton
-            t_kWeight[0]      = event.genWeight*args.weight/sumWtot 
+            t_kWeight[0]      = event.genWeight*args.xs/sumWtot 
             t_kFile[0]        = ii 
             count.sumW        += t_kWeight[0]
             count.sumW2       += t_kWeight[0]*t_kWeight[0]
