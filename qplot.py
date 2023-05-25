@@ -90,7 +90,7 @@ def save(filename):
     os.system("mkdir -p "+outputDir)
     if not os.path.exists(outputDir+'/index.php'):
         pathname = os.path.dirname(sys.argv[0])        
-        os.system("cp "+pathname+"/index.php "+outputDir)
+        os.system("cp ~/qplot/index.php "+outputDir)
     filePDF = outputDir+'/'+filename+'.pdf' 
     filePNG = outputDir+'/'+filename+'.png'
     print("saving: \n"+filePDF+"\n"+filePNG)
@@ -215,7 +215,7 @@ def makeHistos(histos):
     for ii, histo in enumerate(histos):
 	    if len(args.leg) == len(histos) and args.leg!='':histo.SetTitle(str(args.leg[ii]))
 	    sumW  = histo.GetSumOfWeights()
-	    print('%s has sumW = %2.1f'%(histo.GetTitle(), sumW))
+	    print('%s has sumW = %2.1f and mean = %2.1f sigma = %2.1f'%(histo.GetTitle(), sumW, histo.GetMean(), histo.GetRMS()))
          
     if args.nover: moveOverflow(histos)
     if args.nunder: moveUnderflow(histos)
@@ -334,7 +334,7 @@ if __name__ == "__main__":
   
    ### create global pointers to TCanvas and TLegend, histos and define color styles and more
    histos = []
-   can1 = ROOT.TCanvas('can1','can1')
+   can1 = ROOT.TCanvas('can1','can1', 500, 500)
    (lx1, ly1, lx2, ly2) = (float(x) for x in args.legpos.split(','))
    leg = ROOT.TLegend(lx1, ly1, lx2, ly2)
    colors = [1, 2, 4, 6, 7, 8, 9]
