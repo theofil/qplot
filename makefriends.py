@@ -52,7 +52,7 @@ class counter:
     pass
 
 ### list of known TTrees
-listOfknownTrees = ['Events','events', 'ntuple/tree','tree']
+listOfknownTrees = ['Events','events', 'ntuple/tree', 'tree', 'Data']
 
 if __name__ == "__main__":
     tfiles = [ROOT.TFile.Open(f) for f in args.files]
@@ -83,6 +83,7 @@ if __name__ == "__main__":
     for ii, ttree in enumerate(ttrees):
 	df = ROOT.RDataFrame(ttree)
         sumW = 0
+        if args.genWeight != 'genWeight': ttree.SetAlias('genWeight', args.genWeight)
         try:
 	    sumW = df.Sum(args.genWeight).GetValue() 
 	except TypeError:
