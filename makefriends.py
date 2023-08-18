@@ -12,7 +12,7 @@ ROOT.gErrorIgnoreLevel = ROOT.kWarning
 ### parse external parameters
 import argparse
 
-### overide default argparse behavior of the error method 
+### overide default argparse behavior of the error method
 class MyParser(argparse.ArgumentParser):
     def error(self, message):
         sys.stderr.write('error: %s\n' % message)
@@ -34,16 +34,16 @@ def printListOfkeys(tfile):tfile.GetListOfKeys().Print()
 
 ### print list of possible variables of the ROOT file
 def printListOfLeaves(myttree, filename = ''):
-    if filename != '': 
-	fp = open(filename, 'w')
+    if filename != '':
+        fp = open(filename, 'w')
         print('opening %s to write the list of leaves for %s'%(filename, myttree.GetName()))
-        for leave in myttree.GetListOfLeaves(): 
+        for leave in myttree.GetListOfLeaves():
             print(leave)
             fp.write(str(leave)+'\n')
         print('closing %s'%filename)
         fp.close()
     else:
-    	for leave in myttree.GetListOfLeaves(): 
+        for leave in myttree.GetListOfLeaves():
             print(leave)
 
 # make a simple counter
@@ -63,9 +63,9 @@ if __name__ == "__main__":
     ttrees = [tfile.Get(ttree) for tfile in tfiles  for ttree in listOfknownTrees if tfile != None and tfile.Get(ttree)!=None]
     for ttree in ttrees: ttree.tfile = ttree.GetCurrentFile()
 
-    if len(ttrees) != len(tfiles): 
-	print('not all tfiles have been found with a valid ttree, exiting')
-	os._exit(0)
+    if len(ttrees) != len(tfiles):
+        print('not all tfiles have been found with a valid ttree, exiting')
+        os._exit(0)
 
     minimalPrint = True
 
@@ -81,25 +81,25 @@ if __name__ == "__main__":
     sumWtot = 0
     Ntot = 0
     for ii, ttree in enumerate(ttrees):
-	df = ROOT.RDataFrame(ttree)
+        df = ROOT.RDataFrame(ttree)
         sumW = 0
         if args.genWeight != 'genWeight': ttree.SetAlias('genWeight', args.genWeight)
         try:
-	    sumW = df.Sum(args.genWeight).GetValue() 
-	except TypeError:
-	    print(args.genWeight, " is not part of the given ttrees, use --genWeight branchName to fix this or assume no such branch and count each entry as 1 event")
+            sumW = df.Sum(args.genWeight).GetValue()
+        except TypeError:
+            print(args.genWeight, " is not part of the given ttrees, use --genWeight branchName to fix this or assume no such branch and count each entry as 1 event")
             sumW = ttree.GetEntries()
         print('%s with %d entries and sumW = %2.1f'%(tfiles[ii].GetName(), ttree.GetEntries(), sumW))
         Ntot += ttree.GetEntries()
         sumWtot += sumW
-    
+
     print("sumWtot %d   Ntot %d"%(sumWtot, Ntot))
 
-    ### one output tree for all inputs, using the name of the first by default 
-    outname = tfiles[0].GetName()[0:-4].split('/')[-1]+'friend'+'.root' 
+    ### one output tree for all inputs, using the name of the first by default
+    outname = tfiles[0].GetName()[0:-4].split('/')[-1]+'friend'+'.root'
 
     ### change the outname on user's request
-    if args.output != '': outname = args.output 
+    if args.output != '': outname = args.output
     ofile = ROOT.TFile(outname,"RECREATE")
     otree = ROOT.TTree(ttree.GetName(), ttree.GetName()) # same name as original
 
@@ -108,7 +108,7 @@ if __name__ == "__main__":
 
     ### ttree variables
     tvars = []
-   
+
     t_kWeight      = array('f', [0]); tvars += [t_kWeight]
     t_kFile        = array('i', [0]); tvars += [t_kFile]
 
@@ -128,31 +128,31 @@ if __name__ == "__main__":
     t_GenLepton_eta   = array('f', [-99.9 for i in range(nGenLeptonMax)]); tvars += [t_GenLepton_eta]
     t_GenLepton_pdgId = array('i', [-99 for i in range(nGenLeptonMax)]); tvars += [t_GenLepton_pdgId]
 
-    otree.Branch("kWeight",     t_kWeight,      "kWeight/F") 
-    otree.Branch("kFile",       t_kFile,        "kFile/I") 
-    otree.Branch("GenLLM",      t_GenLLM,       "GenLLM/F") 
-    otree.Branch("GenLLY",      t_GenLLY,       "GenLLY/F") 
-    otree.Branch("GenLLPt",     t_GenLLPt,      "GenLLPt/F") 
-    otree.Branch("GenLLId",     t_GenLLId,      "GenLLId/F") 
+    otree.Branch("kWeight",     t_kWeight,      "kWeight/F")
+    otree.Branch("kFile",       t_kFile,        "kFile/I")
+    otree.Branch("GenLLM",      t_GenLLM,       "GenLLM/F")
+    otree.Branch("GenLLY",      t_GenLLY,       "GenLLY/F")
+    otree.Branch("GenLLPt",     t_GenLLPt,      "GenLLPt/F")
+    otree.Branch("GenLLId",     t_GenLLId,      "GenLLId/F")
 
-    otree.Branch("nGenJet",     t_nGenJet,      "nGenJet/I") 
-    otree.Branch("GenJet_pt",   t_GenJet_pt,    "GenJet_pt[nGenJet]/F") 
-    otree.Branch("GenJet_eta",  t_GenJet_eta,   "GenJet_eta[nGenJet]/F") 
+    otree.Branch("nGenJet",     t_nGenJet,      "nGenJet/I")
+    otree.Branch("GenJet_pt",   t_GenJet_pt,    "GenJet_pt[nGenJet]/F")
+    otree.Branch("GenJet_eta",  t_GenJet_eta,   "GenJet_eta[nGenJet]/F")
 
-    otree.Branch("nGenLepton",     t_nGenLepton,      "nGenLepton/I") 
-    otree.Branch("GenLepton_pt",   t_GenLepton_pt,    "GenLepton_pt[nGenLepton]/F") 
-    otree.Branch("GenLepton_eta",  t_GenLepton_eta,   "GenLepton_eta[nGenLepton]/F") 
-    otree.Branch("GenLepton_pdgId",  t_GenLepton_pdgId,   "GenLepton_pdgId[nGenLepton]/I") 
+    otree.Branch("nGenLepton",     t_nGenLepton,      "nGenLepton/I")
+    otree.Branch("GenLepton_pt",   t_GenLepton_pt,    "GenLepton_pt[nGenLepton]/F")
+    otree.Branch("GenLepton_eta",  t_GenLepton_eta,   "GenLepton_eta[nGenLepton]/F")
+    otree.Branch("GenLepton_pdgId",  t_GenLepton_pdgId,   "GenLepton_pdgId[nGenLepton]/I")
 
-   
+
     def reset():
-	global tvars
-	for var in tvars:
-	    typecode = var.typecode
-	    for i in range(len(var)):
-		if typecode == 'f': var[i] = -99.9
-		if typecode == 'i': var[i] = int(-99)
-		if typecode == 'B': var[i] = False
+        global tvars
+        for var in tvars:
+            typecode = var.typecode
+            for i in range(len(var)):
+                if typecode == 'f': var[i] = -99.9
+                if typecode == 'i': var[i] = int(-99)
+                if typecode == 'B': var[i] = False
 
     count = counter()
     count.alleve   = 0
@@ -161,82 +161,82 @@ if __name__ == "__main__":
 
     ### loop over the trees
     for ii,ttree in enumerate(ttrees):
-	print("opening %s"%tfiles[ii].GetName())
+        print("opening %s"%tfiles[ii].GetName())
 
-	### start the bloody event loop for each tree
-	for iev, event in enumerate(ttree):
-	    if args.goFast and iev >=  args.goFast*ttree.GetEntries()  : break
-	    if minimalPrint and iev%10000 == 0: print('event %d of %s'%(iev, tfiles[ii].GetName()))
+        ### start the bloody event loop for each tree
+        for iev, event in enumerate(ttree):
+            if args.goFast and iev >=  args.goFast*ttree.GetEntries()  : break
+            if minimalPrint and iev%10000 == 0: print('event %d of %s'%(iev, tfiles[ii].GetName()))
 
             ### magic starts here
-	    reset()
+            reset()
 
-	    nGenDressedLepton = event.nGenDressedLepton
-            t_kWeight[0]      = event.genWeight*args.xs/sumWtot 
-            t_kFile[0]        = ii 
+            nGenDressedLepton = event.nGenDressedLepton
+            t_kWeight[0]      = event.genWeight*args.xs/sumWtot
+            t_kFile[0]        = ii
             count.sumW        += t_kWeight[0]
             count.sumW2       += t_kWeight[0]*t_kWeight[0]
             hSumW.Fill(0, t_kWeight[0])
 
             GenLeptons = []
             for i in range(event.nGenDressedLepton):
-		GenLepton_pt         = event.GenDressedLepton_pt[i]
-		GenLepton_eta        = event.GenDressedLepton_eta[i]
-		GenLepton_phi        = event.GenDressedLepton_phi[i]
-		GenLepton_mass       = event.GenDressedLepton_mass[i]
-		GenLepton_pdgId      = event.GenDressedLepton_pdgId[i]
-		GenLepton            = ROOT.TLorentzVector()
-		GenLepton.SetPtEtaPhiM(GenLepton_pt, GenLepton_eta, GenLepton_phi, GenLepton_mass)
+                GenLepton_pt         = event.GenDressedLepton_pt[i]
+                GenLepton_eta        = event.GenDressedLepton_eta[i]
+                GenLepton_phi        = event.GenDressedLepton_phi[i]
+                GenLepton_mass       = event.GenDressedLepton_mass[i]
+                GenLepton_pdgId      = event.GenDressedLepton_pdgId[i]
+                GenLepton            = ROOT.TLorentzVector()
+                GenLepton.SetPtEtaPhiM(GenLepton_pt, GenLepton_eta, GenLepton_phi, GenLepton_mass)
                 GenLepton.pdgId      = GenLepton_pdgId
-		GenLeptons += [GenLepton]
-                
-	    if len(GenLeptons) >= 2:
-		genl1 = GenLeptons[0]
-		genl2 = GenLeptons[1]
-		t_GenLLM[0]  = (genl1 + genl2).M()        
-		t_GenLLY[0]  = (genl1 + genl2).Y()        
-		t_GenLLPt[0] = (genl1 + genl2).Pt()        
-		t_GenLLId[0] = genl1.pdgId*genl2.pdgId       
+                GenLeptons += [GenLepton]
+
+            if len(GenLeptons) >= 2:
+                genl1 = GenLeptons[0]
+                genl2 = GenLeptons[1]
+                t_GenLLM[0]  = (genl1 + genl2).M()
+                t_GenLLY[0]  = (genl1 + genl2).Y()
+                t_GenLLPt[0] = (genl1 + genl2).Pt()
+                t_GenLLId[0] = genl1.pdgId*genl2.pdgId
 
 
 
 
             GenJets = []
             for i in range(event.nGenJet):
-		GenJetpt         = event.GenJet_pt[i]
-		GenJeteta        = event.GenJet_eta[i]
-		GenJetphi        = event.GenJet_phi[i]
-		GenJetmass       = event.GenJet_mass[i]
-		GenJet           = ROOT.TLorentzVector()
-		GenJet.SetPtEtaPhiM(GenJetpt, GenJeteta, GenJetphi, GenJetmass)
+                GenJetpt         = event.GenJet_pt[i]
+                GenJeteta        = event.GenJet_eta[i]
+                GenJetphi        = event.GenJet_phi[i]
+                GenJetmass       = event.GenJet_mass[i]
+                GenJet           = ROOT.TLorentzVector()
+                GenJet.SetPtEtaPhiM(GenJetpt, GenJeteta, GenJetphi, GenJetmass)
                 if GenJet.Pt()>20:
-		    GenJets += [GenJet]
+                    GenJets += [GenJet]
 
             nJetsRemoved = 0
-	    for lepton in GenLeptons:
-		for GenJet in GenJets:
-		    DR = GenJet.DeltaR(lepton)
-		    if DR < 0.4:
-			GenJets.remove(GenJet)
-			nJetsRemoved += 1
+            for lepton in GenLeptons:
+                for GenJet in GenJets:
+                    DR = GenJet.DeltaR(lepton)
+                    if DR < 0.4:
+                        GenJets.remove(GenJet)
+                        nJetsRemoved += 1
 
-	    t_nGenJet[0]  = len(GenJets)
+            t_nGenJet[0]  = len(GenJets)
             nGenJetToStore = min(nGenJetMax, t_nGenJet[0])
-	    for i in range(nGenJetToStore):
-		t_GenJet_pt[i] = round(GenJets[i].Pt(), 1)
-		t_GenJet_eta[i] = round(GenJets[i].Eta(), 2)
+            for i in range(nGenJetToStore):
+                t_GenJet_pt[i] = round(GenJets[i].Pt(), 1)
+                t_GenJet_eta[i] = round(GenJets[i].Eta(), 2)
 
-	    t_nGenLepton[0]  = len(GenLeptons)
+            t_nGenLepton[0]  = len(GenLeptons)
             nGenLeptonToStore = min(nGenLeptonMax, t_nGenLepton[0])
-	    for i in range(nGenLeptonToStore):
-		t_GenLepton_pt[i] = round(GenLeptons[i].Pt(), 1)
-		t_GenLepton_eta[i] = round(GenLeptons[i].Eta(), 2)
-		t_GenLepton_pdgId[i] = GenLeptons[i].pdgId
+            for i in range(nGenLeptonToStore):
+                t_GenLepton_pt[i] = round(GenLeptons[i].Pt(), 1)
+                t_GenLepton_eta[i] = round(GenLeptons[i].Eta(), 2)
+                t_GenLepton_pdgId[i] = GenLeptons[i].pdgId
 
 
             ### fill tree
-	    otree.Fill()
-	    count.alleve += 1
+            otree.Fill()
+            count.alleve += 1
 
     print('hSumW.Integral() %2.1f'%hSumW.Integral())
     print('number of events processed %d'%count.alleve)
@@ -244,11 +244,9 @@ if __name__ == "__main__":
     print('number of sumW %3.1f'%count.sumW)
     print('number of sumW2 %3.1f'%count.sumW2)
 
-    ### creating output 
+    ### creating output
     ofile.cd()
     otree.Write()
     hSumW.Write()
     ofile.Write()
     ofile.Close()
-   
-     
