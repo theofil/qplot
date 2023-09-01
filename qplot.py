@@ -284,7 +284,11 @@ def plotHistos(histos):
             histos[ii].Draw(drawopt)
             histos[ii].GetYaxis().SetRangeUser(yMin, yMax)
         else:
+            histos[ii].SetMarkerStyle(1)
+            histos[ii].SetMarkerColor(colors[ii])
             histos[ii].Draw("hist same")    
+            if "e1" in drawopt: histos[ii].Draw("hist same e1")    
+            histos[0].Draw(drawopt+"same")
     leg.SetTextSize(26)
     leg.SetTextFont(43)
     leg.SetFillColor(ROOT.kWhite)
