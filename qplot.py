@@ -47,6 +47,7 @@ parser.add_argument('--nunder', help = 'don\'t move underflow to first bin, by d
 parser.add_argument('--debug', help = 'debug mode, verbose print-out',  action='store_true')
 parser.add_argument('--legpos', default = '0.65,0.75,0.93,0.90', help = 'positioning of the legend, default is top-right: 0.65, 0.75 , 0.93, 0.90')
 parser.add_argument('--save', nargs='?', default = '', help = 'give filename of the figures to be saved, will produce filename.pdf and filename.png')
+parser.add_argument('--outputDir', nargs='?', default = 'qplots', help = 'give directory name for the figures to be saved, will create it if does not exit')
 args = parser.parse_args()
 
 
@@ -85,7 +86,7 @@ no = {'no','n',''}
 
 ### save a figure
 def save(filename):
-    outputDir = 'qplots'
+    outputDir = args.outputDir
     print('creating folder',outputDir,' if does not already exist and saving figures')
     os.system("mkdir -p "+outputDir)
     if not os.path.exists(outputDir+'/index.php'):
