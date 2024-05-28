@@ -300,7 +300,11 @@ def plotHistos(histos):
     can1.Update()
 
 def guessMissingArgs(args):
-    if args.xtitle == '': args.xtitle = args.var
+    knownlabels = {"mjj": "m(jj) [GeV]", "ptjj": "P_{T}(jj) [GeV]", "dPhijj":"#Delta#Phi(jj)", "dYjj":"#DeltaY(jj)"}
+    if args.xtitle == '':        
+        args.xtitle = args.var
+        if args.var in knownlabels: args.xtitle = knownlabels[args.var]
+
     if args.ytitle == '': 
         if args.norm: args.ytitle = 'Frequency' 
         else: args.ytitle = 'Events / bin'
@@ -351,10 +355,19 @@ if __name__ == "__main__":
        guessMissingArgs(args) 
        makeHistos(histos)
        ### saving output to default folder, qplots
-       if args.save==None:save(args.var[0])
-       if args.save!=None and args.save!='':save(args.save)
-    
-       
+       ofile = args.var[0]
+       if args.save!=None and args.save!='': ofile = args.save
+       ofile = ofile.replace('[', '')
+       ofile = ofile.replace(']', '')
+       ofile = ofile.replace('(', '')
+       ofile = ofile.replace(')', '')
+       if args.norm: ofile = ofile + '.norm' 
+       save(ofile)
+       for histo in histos:
+            integral = histo.Integral()
+            entries  = histo.GetEntries()
+
+            print('%2.1f  [entries %d]'%(integral, entries))
 
 
 
