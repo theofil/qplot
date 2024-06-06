@@ -31,12 +31,12 @@ args = parser.parse_args()
 def printListOfkeys(tfile):tfile.GetListOfKeys().Print()
 
 ### list of known TTrees
-listOfknownTrees = ['Events','events', 'ntuple/tree','tree']
+listOfknownTrees = ['Events','events', 'ntuple/tree','tree','Data']
 
 if __name__ == "__main__":
-   print('lazyskim script by KT, examples:')
-   print('    python -i skimming/lazyskim.py sum_EWKWJets.root  --var \'nGenJet,GenJet_pt\'')
-   print('    python -i skimming/lazyskim.py sum_EWKWJets.root --varfile vars.txt')
+   print('lazyskim script by KT, example:')
+   print('    python3 lazyskim.py ~/files/andreas/VBFHToBB.root --var "nJets,jetPt,jetEta')
+   print('please omit any space between the vars that should be only comma separated without any space in between')
    tfiles = [ROOT.TFile.Open(f) for f in args.files]
 
    ### read the TTrees from files check if ttree is from list of known, or force to use external
@@ -54,33 +54,19 @@ if __name__ == "__main__":
    if len(set(ttreeNames))!=1 and len(ttreeNames)>0: print('Warning: not all TTrees have the same name %s'%ttreeNames)
    else: args.ttree = ttreeNames[0]
 
-   ### vars
-   noVars = True
-   if  args.var != '':
-       vars = args.var.split(',')
-       noVars = False
-   else:
-       varfile = open(args.varfile, 'r')   
-       vars = [line.rstrip('\n') for line in varfile if line[0] != '#']
-       noVars = False
-  
-   vars = [var for var in vars if var != ''] 
+   for ii,ttree in enumerate(ttrees):
+       ### creating output using RDataFrame
+       df = ROOT.RDataFrame(ttree)
+       #df.Filter([](double t) { return t > 0.; }, {"theta"})
+       if args.sel: 
+          print('applying the filter: %s'%args.sel)
+          df = df.Filter(args.sel)
+       outname = tfiles[ii].GetName()[0:-4].split('/')[-1]+'lazyskim'+'.root'
+       
+       ### print information
+       if args.var !='': print('creating %s for the TTree %s and the following branches %s'%(outname, ttree.GetName(), args.var))
+       else: print('creating %s for the TTree %s for all branches'%(outname, ttree.GetName()))
 
-   ### setting branches
-   if not noVars:
-       print('will save the following vars', vars)
-       for ii,ttree in enumerate(ttrees):
-           ttree.SetBranchStatus('*',0)
-           for var in vars:
-               ttree.SetBranchStatus(var,1)
-
-           ### creating output 
-           #outname = tfiles[ii].GetName()[0:-4]+'lazyskim'+'.root'
-           outname = tfiles[ii].GetName()[0:-4].split('/')[-1]+'lazyskim'+'.root'
-           newfile = ROOT.TFile(outname,"RECREATE")
-           newTTree = ttree.CloneTree()
-           newTTree.Print()
-           newfile.Write()
-           newfile.Close()
-   
-     
+       ### save the Snapshot
+       df.Snapshot(ttree.GetName(), outname, set(args.var.split(',')))
+       #df.Snapshot(ttree.GetName(), outname, {'nJets','jetPt'})
