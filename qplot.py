@@ -41,6 +41,7 @@ parser.add_argument('--drawopt', default = '', help = 'draw options')
 parser.add_argument('--leg', default='', type =string2list, help = 'list of name for the TLegend')
 parser.add_argument('--logy', help = 'set log scale in the y-axis', action='store_true')
 parser.add_argument('--norm', help = 'normalize histograms', action='store_true')
+parser.add_argument('--yaxisCentered', help = 'center the title in the y-axis', action='store_true')
 parser.add_argument('--logx', help = 'set log scale in the x-axis', action='store_true')
 parser.add_argument('--nover', help = 'don\'t move overflow to last bin, by default is True',     action='store_false')
 parser.add_argument('--nunder', help = 'don\'t move underflow to first bin, by default is True',  action='store_false')
@@ -92,6 +93,10 @@ def save(filename):
     if not os.path.exists(outputDir+'/index.php'):
         pathname = os.path.dirname(sys.argv[0])        
         os.system("cp ~/qplot/index.php "+outputDir)
+    filename = filename.replace('/180*3.141592653','')
+    filename = filename.replace('*','')
+    filename = filename.replace('(','')
+    filename = filename.replace(')','')
     filePDF = outputDir+'/'+filename+'.pdf' 
     filePNG = outputDir+'/'+filename+'.png'
     print("saving: \n"+filePDF+"\n"+filePNG)
@@ -262,12 +267,15 @@ def plotHistos(histos):
         yMin = float(args.yrange.split(',')[0])
         yMax = float(args.yrange.split(',')[1])
 
+
     print('yMin = %2.3f yMax = %2.3f'%(yMin, yMax))
 
     for ii,histo in enumerate(histos):
         if len(args.leg) == len(histos) and args.leg!='':histo.SetTitle(str(args.leg[ii]))
         histo.GetXaxis().SetNdivisions(505)
         histo.GetYaxis().SetNdivisions(505)
+
+        if args.yaxisCentered == True:  histo.GetYaxis().CenterTitle(True);
        
         
         histo.SetLineWidth(4)
@@ -306,7 +314,7 @@ def guessMissingArgs(args):
         if args.var in knownlabels: args.xtitle = knownlabels[args.var]
 
     if args.ytitle == '': 
-        if args.norm: args.ytitle = 'Frequency' 
+        if args.norm: args.ytitle = 'Probability / bin' 
         else: args.ytitle = 'Events / bin'
 
 
